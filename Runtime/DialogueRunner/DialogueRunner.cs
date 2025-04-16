@@ -134,6 +134,8 @@ namespace Yarn.Unity
         /// The object that manages the Yarn variables used by this Dialogue Runner.
         /// </summary>
         [SerializeField] internal VariableStorageBehaviour? variableStorage;
+        
+        [SerializeField] internal GameObjectResolverBehaviour? objectResolver;
 
         /// <summary>
         /// Gets the <see cref="YarnProject"/> asset that this dialogue runner uses.
@@ -162,6 +164,19 @@ namespace Yarn.Unity
                 return variableStorage;
             }
             set => variableStorage = value;
+        }
+        
+        public GameObjectResolverBehaviour ObjectResolver
+        {
+            get
+            {
+                if (objectResolver == null)
+                {
+                    this.objectResolver = gameObject.AddComponent<FindGameObjectBehaviour>();
+                }
+                return this.objectResolver;
+            }
+            set => this.objectResolver = value;
         }
 
         [SerializeReference] internal LineProviderBehaviour? lineProvider;
@@ -374,7 +389,7 @@ namespace Yarn.Unity
         {
             if (_commandDispatcher == null)
             {
-                var actions = new Actions(this, Dialogue.Library);
+                var actions = new Actions(this, this.ObjectResolver, Dialogue.Library);
                 _commandDispatcher = actions;
                 actions.RegisterActions();
             }

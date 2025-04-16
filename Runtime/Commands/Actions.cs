@@ -49,16 +49,26 @@ namespace Yarn.Unity
     {
         internal class CommandRegistration : ICommand
         {
-            public CommandRegistration(string name, Delegate @delegate)
+            public CommandRegistration(string name, Delegate @delegate, IObjectResolver resolver)
             {
                 Name = name;
                 Method = @delegate.Method;
                 Target = @delegate.Target;
-                Converters = CreateConverters(Method);
+                Converters = CreateConverters(Method, resolver);
                 DynamicallyFindsTarget = false;
             }
+            
+            public CommandRegistration(string name, Delegate @delegate): this(name, @delegate, new FindGameObjectResolver())
+            {
+                
+            }
 
-            public CommandRegistration(string name, MethodInfo method)
+            public CommandRegistration(string name, MethodInfo method): this(name, method, new FindGameObjectResolver())
+            {
+                
+            }
+
+            public CommandRegistration(string name, MethodInfo method, IObjectResolver resolver)
             {
                 if (method.IsStatic)
                 {
@@ -82,7 +92,7 @@ namespace Yarn.Unity
                 Method = method;
                 Target = null;
 
-                Converters = CreateConverters(method);
+                Converters = CreateConverters(method, resolver);
             }
 
             public string Name { get; set; }
@@ -325,7 +335,7 @@ namespace Yarn.Unity
                 }
             }
 
-            internal CommandDispatchResult Invoke(MonoBehaviour dispatcher, List<string> parameters)
+            internal CommandDispatchResult Invoke(MonoBehaviour dispatcher, List<string> parameters, IObjectResolver resolver)
             {
                 object? target;
 
@@ -350,7 +360,7 @@ namespace Yarn.Unity
 
                     parameters.RemoveAt(0);
 
-                    var gameObject = GameObject.Find(gameObjectName);
+                    var gameObject = resolver.Resolve(gameObjectName);
 
                     if (gameObject == null)
                     {
@@ -527,13 +537,15 @@ namespace Yarn.Unity
 
         public Library Library { get; }
         public IActionRegistration ActionRegistrar { get; }
+        public IObjectResolver Resolver { get; }
 
         public IEnumerable<ICommand> Commands => _commands.Values;
 
-        public Actions(IActionRegistration actionRegistrar, Library library)
+        public Actions(IActionRegistration actionRegistrar, IObjectResolver resolver, Library library)
         {
             Library = library;
             ActionRegistrar = actionRegistrar;
+            Resolver = resolver;
         }
 
         private static string GetFullMethodName(MethodInfo method)
@@ -567,7 +579,7 @@ namespace Yarn.Unity
 #if YARN_SOURCE_GENERATION_DEBUG_LOGGING
                 Debug.Log($"Registering command {commandName}");
 #endif
-                _commands.Add(commandName, new CommandRegistration(commandName, handler));
+                _commands.Add(commandName, new CommandRegistration(commandName, handler, Resolver));
             }
         }
 
@@ -606,7 +618,7 @@ namespace Yarn.Unity
             }
             else
             {
-                _commands.Add(commandName, new CommandRegistration(commandName, methodInfo));
+                _commands.Add(commandName, new CommandRegistration(commandName, methodInfo, Resolver));
             }
         }
         public void RemoveCommandHandler(string commandName)
@@ -650,7 +662,7 @@ namespace Yarn.Unity
                 // passed to the command.
                 commandPieces.RemoveAt(0);
 
-                return registration.Invoke(coroutineHost, commandPieces);
+                return registration.Invoke(coroutineHost, commandPieces, this.Resolver);
             }
             else
             {
@@ -676,7 +688,7 @@ namespace Yarn.Unity
                 // passed to the command.
                 commandPieces.RemoveAt(0);
 
-                return registration.Invoke(coroutineHost, commandPieces);
+                return registration.Invoke(coroutineHost, commandPieces, this.Resolver);
             }
             else
             {
@@ -684,7 +696,7 @@ namespace Yarn.Unity
             }
         }
 
-        private static Converter[] CreateConverters(MethodInfo method)
+        private static Converter[] CreateConverters(MethodInfo method, IObjectResolver resolver)
         {
             ParameterInfo[] parameterInfos = method.GetParameters();
 
@@ -703,13 +715,13 @@ namespace Yarn.Unity
                         throw new ArgumentException($"Can't register method {method.Name}: Parameter {i + 1} ({parameterInfo.Name}): array parameters are required to be last.");
                     }
                 }
-                result[i] = CreateConverter(parameterInfo, i);
+                result[i] = CreateConverter(parameterInfo, i, resolver);
                 i++;
             }
             return result;
         }
 
-        private static System.Func<string, int, object?> CreateConverter(ParameterInfo parameter, int index)
+        private static System.Func<string, int, object?> CreateConverter(ParameterInfo parameter, int index, IObjectResolver resolver)
         {
             var targetType = parameter.ParameterType;
             string name = parameter.Name;
@@ -721,7 +733,7 @@ namespace Yarn.Unity
                 // it with the arguments found in the command.
 
                 var paramsArrayType = targetType.GetElementType();
-                var elementConverter = CreateConverterFunction(paramsArrayType, name);
+                var elementConverter = CreateConverterFunction(paramsArrayType, name, resolver);
                 return elementConverter;
 
             }
@@ -729,11 +741,11 @@ namespace Yarn.Unity
             {
                 // This parameter is for a single value. Make a converter that
                 // receives a single string, 
-                return CreateConverterFunction(targetType, name);
+                return CreateConverterFunction(targetType, name, resolver);
             }
         }
 
-        private static Converter CreateConverterFunction(Type targetType, string parameterName)
+        private static Converter CreateConverterFunction(Type targetType, string parameterName, IObjectResolver resolver)
         {
 
             // well, I mean...
@@ -742,7 +754,7 @@ namespace Yarn.Unity
             // find the GameObject.
             if (typeof(GameObject).IsAssignableFrom(targetType))
             {
-                return (arg, i) => GameObject.Find(arg);
+                return (arg, i) => resolver.Resolve(arg);
             }
 
             // find components of the GameObject with the component, if
@@ -751,7 +763,7 @@ namespace Yarn.Unity
             {
                 return (arg, i) =>
                 {
-                    GameObject gameObject = GameObject.Find(arg);
+                    GameObject gameObject = resolver.Resolve(arg);
                     if (gameObject == null)
                     {
                         return null;
