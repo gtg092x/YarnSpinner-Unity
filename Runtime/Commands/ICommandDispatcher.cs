@@ -8,7 +8,7 @@ using UnityEngine;
 
 namespace Yarn.Unity
 {
-    interface ICommandDispatcher : IActionRegistration
+    public interface ICommandDispatcher : IActionRegistration
     {
         CommandDispatchResult DispatchCommand(string command, MonoBehaviour coroutineHost);
 
