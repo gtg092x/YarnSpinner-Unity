@@ -633,7 +633,7 @@ namespace Yarn.Unity
             // no-op
         }
 
-        CommandDispatchResult DispatchCommand(string command, MonoBehaviour coroutineHost)
+        public CommandDispatchResult DispatchCommand(string command, MonoBehaviour coroutineHost)
         {
             var commandPieces = new List<string>(DialogueRunner.SplitCommandText(command));
 
