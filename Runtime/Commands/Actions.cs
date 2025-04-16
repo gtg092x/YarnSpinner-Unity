@@ -634,9 +634,30 @@ namespace Yarn.Unity
         }
 
         public CommandDispatchResult Dispatch(string command, MonoBehaviour coroutineHost) {
-            return this.DispatchCommand(command, coroutineHost);
-        }
+            var commandPieces = new List<string>(DialogueRunner.SplitCommandText(command));
 
+            if (commandPieces.Count == 0)
+            {
+                // No text was found inside the command, so we won't be able to
+                // find it.
+                return new CommandDispatchResult(CommandDispatchResult.StatusType.CommandUnknown, YarnTask.CompletedTask);
+            }
+
+            if (_commands.TryGetValue(commandPieces[0], out var registration))
+            {
+                // The first part of the command is the command name itself.
+                // Remove it to get the collection of parameters that were
+                // passed to the command.
+                commandPieces.RemoveAt(0);
+
+                return registration.Invoke(coroutineHost, commandPieces);
+            }
+            else
+            {
+                return new CommandDispatchResult(CommandDispatchResult.StatusType.CommandUnknown);
+            }
+        }
+        
         CommandDispatchResult ICommandDispatcher.DispatchCommand(string command, MonoBehaviour coroutineHost)
         {
             var commandPieces = new List<string>(DialogueRunner.SplitCommandText(command));
