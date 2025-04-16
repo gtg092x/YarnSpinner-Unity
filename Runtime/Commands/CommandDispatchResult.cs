@@ -23,7 +23,7 @@ namespace Yarn.Unity
             InvalidParameterCount,
         }
 
-        internal enum StatusType
+        public enum StatusType
         {
 
             Succeeded,
