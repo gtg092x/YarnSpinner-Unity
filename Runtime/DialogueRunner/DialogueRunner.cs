@@ -353,7 +353,7 @@ namespace Yarn.Unity
         private CancellationTokenSource? currentLineHurryUpSource;
         private YarnTaskCompletionSource? dialogueCompletionSource;
 
-        internal ICommandDispatcher CommandDispatcher
+        public ICommandDispatcher CommandDispatcher
         {
             get
             {
