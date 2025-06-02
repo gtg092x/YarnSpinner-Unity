@@ -3,25 +3,43 @@ Yarn Spinner is licensed to you under the terms found in the file LICENSE.md.
 */
 
 using System.Threading;
-using System.Threading.Tasks;
 using UnityEngine;
+using Yarn.Markup;
 using Yarn.Unity.Attributes;
+
+#if USE_TMP
+using TMPro;
+#else
+using TextMeshProUGUI = Yarn.Unity.TMPShim;
+#endif
 
 #nullable enable
 
 namespace Yarn.Unity
 {
     /// <summary>
-    /// A dialogue view that listens for user input and sends requests to a <see
+    /// A dialogue presenter that listens for user input and sends requests to a <see
     /// cref="DialogueRunner"/> to advance the presentation of the current line,
     /// either by asking a dialogue runner to hurry up its delivery, advance to
     /// the next line, or cancel the entire dialogue session.
     /// </summary>
-    public sealed class LineAdvancer : DialoguePresenterBase
+    public sealed class LineAdvancer : DialoguePresenterBase, IActionMarkupHandler
     {
-        [MustNotBeNull]
+        [MustNotBeNull("Line Advancer needs to know which Dialogue Runner should be told to tell it to show the next line.")]
         [Tooltip("The dialogue runner that will receive requests to advance or cancel content.")]
         [SerializeField] DialogueRunner? runner;
+
+        /// <summary>
+        /// The <see cref="DialoguePresenterBase"/> that this LineAdvancer
+        /// should subscribe to for notifications that the line is fully
+        /// visible.
+        /// </summary>
+        /// <remarks>When <see cref="RequestLineHurryUp"/> is called, if the
+        /// line is fully visible, the <see cref="runner"/> object will have its
+        /// <see cref="DialogueRunner.RequestNextLine"/> method called (instead
+        /// of its <see cref="DialogueRunner.RequestHurryUpLine"/> method).
+        ///</remarks>
+        [SerializeField] DialoguePresenterBase? presenter;
 
         /// <summary>
         /// If <see langword="true"/>, repeatedly signalling that the line
@@ -211,7 +229,6 @@ namespace Yarn.Unity
         [Indent]
         [SerializeField] string? cancelDialogueAxis = "";
 
-
         /// <summary>
         /// The <see cref="KeyCode"/> that triggers a request to advance to the
         /// next piece of content.
@@ -250,6 +267,32 @@ namespace Yarn.Unity
             RequestDialogueCancellation();
         }
 #endif
+        // used to track the status of the line
+        // you can think of this as a variation on multiple presses to advance a line
+        // where if the default line presenter is awaiting input it is reasonable that pressing hurry up would advance
+        // but the line presenter can't really tell that apart
+        // so the line advancer instead will handle this
+        // this will only work if for the default line presenter but that is ok as that is the default
+        // as people replace those defaults with more complex views and presenters they will also have to replace the line advancer
+        // or make their presenters also fire off action markup events which is the better approach IMO
+        private enum LineStatus
+        {
+            Unknown, Began, Waiting
+        }
+        private LineStatus status = LineStatus.Unknown;
+
+        void Start()
+        {
+            // If we have a dialogue presenter configured, register ourselves as
+            // a temporal processor, so that we get notified when the line is
+            // fully visible. This is so that when a line is fully visible, the
+            // 'hurry up' action will instead trigger a 'next line' action,
+            // (because there's nothing left to hurry up.)
+            if (presenter != null)
+            {
+                presenter.ActionMarkupHandlers.Add(this);
+            }
+        }
 
         /// <summary>
         /// Called by a dialogue runner when dialogue starts to add input action
@@ -269,6 +312,7 @@ namespace Yarn.Unity
             }
 #endif
 
+            ResetLineTracking();
             return YarnTask.CompletedTask;
         }
 
@@ -289,11 +333,12 @@ namespace Yarn.Unity
             }
 #endif
 
+            ResetLineTracking();
             return YarnTask.CompletedTask;
         }
 
         /// <summary>
-        /// Called by a dialogue view to signal that a line is running.
+        /// Called by a dialogue presenter to signal that a line is running.
         /// </summary>
         /// <inheritdoc cref="LinePresenter.RunLineAsync" path="/param"/>
         /// <returns>A completed task.</returns>
@@ -301,7 +346,8 @@ namespace Yarn.Unity
         {
             // A new line has come in, so reset the number of times we've seen a
             // request to skip.
-            numberOfAdvancesThisLine = 0;
+            ResetLineTracking();
+            status = LineStatus.Began;
 
 #if USE_INPUTSYSTEM
             if (enableActions)
@@ -316,7 +362,7 @@ namespace Yarn.Unity
         }
 
         /// <summary>
-        /// Called by a dialogue view to signal that options are running.
+        /// Called by a dialogue presenter to signal that options are running.
         /// </summary>
         /// <inheritdoc cref="LinePresenter.RunOptionsAsync" path="/param"/>
         /// <returns>A completed task indicating that no option was selected by
@@ -325,7 +371,14 @@ namespace Yarn.Unity
         {
             // This line view doesn't take any actions when options are
             // presented.
+            ResetLineTracking();
             return YarnTask<DialogueOption?>.FromResult(null);
+        }
+
+        private void ResetLineTracking()
+        {
+            numberOfAdvancesThisLine = 0;
+            status = LineStatus.Unknown;
         }
 
         /// <summary>
@@ -353,12 +406,21 @@ namespace Yarn.Unity
             {
                 if (runner != null)
                 {
-                    runner.RequestHurryUpLine();
+                    // if we are in a waiting status and the hurry up is pressed we move to the next line
+                    // can think of this as a variant of tapping the hurry up action the same number of times as advanceRequestsBeforeCancellingLine
+                    if (status == LineStatus.Waiting)
+                    {
+                        runner.RequestNextLine();
+                    }
+                    else
+                    {
+                        runner.RequestHurryUpLine();
+                    }
+
                 }
                 else
                 {
                     Debug.LogError($"{nameof(LineAdvancer)} dialogue runner is null", this);
-                    return;
                 }
             }
         }
@@ -368,6 +430,7 @@ namespace Yarn.Unity
         /// </summary>
         public void RequestNextLine()
         {
+            ResetLineTracking();
             if (runner != null)
             {
                 runner.RequestNextLine();
@@ -375,7 +438,6 @@ namespace Yarn.Unity
             else
             {
                 Debug.LogError($"{nameof(LineAdvancer)} dialogue runner is null", this);
-                return;
             }
         }
 
@@ -385,6 +447,7 @@ namespace Yarn.Unity
         /// </summary>
         public void RequestDialogueCancellation()
         {
+            ResetLineTracking();
             // Stop the dialogue runner, which will cancel the current line as
             // well as the entire dialogue.
             if (runner != null)
@@ -418,6 +481,30 @@ namespace Yarn.Unity
                     break;
             }
         }
-    }
 
+        public void OnPrepareForLine(MarkupParseResult line, TMP_Text text)
+        {
+            return;
+        }
+
+        public void OnLineDisplayBegin(MarkupParseResult line, TMP_Text text)
+        {
+            return;
+        }
+
+        public YarnTask OnCharacterWillAppear(int currentCharacterIndex, MarkupParseResult line, CancellationToken cancellationToken)
+        {
+            return YarnTask.CompletedTask;
+        }
+
+        public void OnLineDisplayComplete()
+        {
+            status = LineStatus.Waiting;
+        }
+
+        public void OnLineWillDismiss()
+        {
+            ResetLineTracking();
+        }
+    }
 }

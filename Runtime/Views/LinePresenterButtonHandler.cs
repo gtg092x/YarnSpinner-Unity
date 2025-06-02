@@ -14,18 +14,13 @@ using TMPro;
 using TMP_Text = Yarn.Unity.TMPShim;
 #endif
 
-/*
-Yarn Spinner is licensed to you under the terms found in the file LICENSE.md.
-*/
-
-
 #nullable enable
 
 namespace Yarn.Unity
 {
     public class LinePresenterButtonHandler : ActionMarkupHandler
     {
-        [MustNotBeNull] [SerializeField] Button? continueButton;
+        [MustNotBeNull, SerializeField] Button? continueButton;
 
         [MustNotBeNullWhen(nameof(continueButton), "A " + nameof(DialogueRunner) + " must be provided for the continue button to work.")]
         [SerializeField] DialogueRunner? dialogueRunner;

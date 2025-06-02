@@ -6,6 +6,8 @@ using System;
 using System.Collections.Generic;
 using UnityEngine;
 
+#nullable enable
+
 namespace Yarn.Unity
 {
     public interface ICommandDispatcher : IActionRegistration

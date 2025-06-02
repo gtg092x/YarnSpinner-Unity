@@ -9,8 +9,8 @@ using System.Threading;
 using UnityEngine;
 using UnityEngine.Events;
 using UnityEngine.UIElements;
-using Yarn.Unity.Legacy;
 using Yarn.Unity.Attributes;
+using Yarn.Unity.Legacy;
 
 #nullable enable
 
@@ -18,20 +18,20 @@ namespace Yarn.Unity
 {
     /// <summary>
     /// A Line Cancellation Token stores information about whether a dialogue
-    /// view should stop its delivery.
+    /// presenter should stop its delivery.
     /// </summary>
     /// <remarks>
-    /// <para>Dialogue views receive Line Cancellation Tokens as a parameter to
+    /// <para>Dialogue presenters receive Line Cancellation Tokens as a parameter to
     /// <see cref="DialoguePresenterBase.RunLineAsync"/>. Line Cancellation
     /// Tokens indicate whether the user has requested that the line's delivery
-    /// should be hurried up, and whether the dialogue view should stop showing
+    /// should be hurried up, and whether the dialogue presenter should stop showing
     /// the current line.</para>
     /// </remarks>
     public struct LineCancellationToken
     {
         /// <summary>
         /// A <see cref="CancellationToken"/> that becomes cancelled when a <see
-        /// cref="DialogueRunner"/> wishes all dialogue views to stop running
+        /// cref="DialogueRunner"/> wishes all dialogue presenters to stop running
         /// the current line. For example, on-screen UI should be dismissed, and
         /// any ongoing audio playback should be stopped.
         /// </summary>
@@ -42,7 +42,7 @@ namespace Yarn.Unity
 
         /// <summary>
         /// A <see cref="CancellationToken"/> that becomes cancelled when a <see
-        /// cref="DialogueRunner"/> wishes all dialogue views to speed up their
+        /// cref="DialogueRunner"/> wishes all dialogue presenters to speed up their
         /// delivery of their line, if appropriate. For example, UI animations
         /// should be played faster or skipped.
         /// </summary>
@@ -57,7 +57,7 @@ namespace Yarn.Unity
         /// </summary>
         /// <remarks>
         /// <para>
-        /// If this value is <see langword="true"/>, dialogue views should
+        /// If this value is <see langword="true"/>, dialogue presenters should
         /// presenting the current line, so that the next piece of content can
         /// be shown to the user.
         /// </para>
@@ -71,8 +71,8 @@ namespace Yarn.Unity
         /// Gets a value indicating whether the user has requested that the line
         /// be hurried up.
         /// </summary>
-        /// <remarks><para>If this value is <see langword="true"/>, dialogue
-        /// views should speed up any ongoing delivery of the line, such as
+        /// <remarks><para>If this value is <see langword="true"/>, Dialogue
+        /// presenters should speed up any ongoing delivery of the line, such as
         /// on-screen animations, but are not required to finish delivering the
         /// line entirely (that is, UI elements may remain on screen).</para>
         /// <para>If <see cref="IsNextLineRequested"/> is <see
@@ -122,6 +122,15 @@ namespace Yarn.Unity
                 }
                 return dialogue;
             }
+        }
+
+        enum SaliencyStrategy
+        {
+            RandomBestLeastRecentlyViewed,
+            FirstBestLeastRecentlyViewed,
+            Best,
+            First,
+            Custom
         }
 
         /// <summary>
@@ -181,6 +190,8 @@ namespace Yarn.Unity
 
         [SerializeReference] internal LineProviderBehaviour? lineProvider;
 
+        [SerializeField] private SaliencyStrategy saliencyStrategy = SaliencyStrategy.RandomBestLeastRecentlyViewed;
+
         /// <summary>
         ///  Gets the <see cref="ILineProvider"/> that this dialogue runner uses
         ///  to fetch localized line content.
@@ -210,7 +221,7 @@ namespace Yarn.Unity
         }
 
         /// <summary>
-        /// The list of dialogue views that the dialogue runner delivers content
+        /// The list of dialogue presenters that the dialogue runner delivers content
         /// to.
         /// </summary>
         [Space]
@@ -248,7 +259,7 @@ namespace Yarn.Unity
         /// <summary>
         /// If this value is set, when an option is selected, the line contained
         /// in it (<see cref="OptionSet.Option.Line"/>) will be delivered to the
-        /// dialogue runner's dialogue views as though it had been written as a
+        /// dialogue runner's dialogue presenters as though it had been written as a
         /// separate line.
         /// </summary>
         /// <remarks>
@@ -350,7 +361,7 @@ namespace Yarn.Unity
         /// Gets a completed <see cref="YarnTask{DialogueOption}"/> that
         /// contains a <see langword="null"/> value.
         /// </summary>
-        /// <remarks>Dialogue views can return this value from their <see
+        /// <remarks>Dialogue presenters can return this value from their <see
         /// cref="DialoguePresenterBase.RunOptionsAsync(DialogueOption[],
         /// CancellationToken)" method to indicate that no option was selected.
         /// />
@@ -414,6 +425,41 @@ namespace Yarn.Unity
         }
 
         /// <summary>
+        /// Sets the saliency strategy based on the value set inside of the Inspector.
+        /// This is called when StartDialogue is run.
+        /// This does no checking and will obliterate any custom strategies if one has been set and you change the value.
+        /// </summary>
+        private void ApplySaliencyStrategy()
+        {
+            // if we don't have any dialogue then we can't apply a saliency strategy
+            if (this.dialogue == null)
+            {
+                return;
+            }
+            // likewise for variable storage
+            if (this.VariableStorage == null)
+            {
+                return;
+            }
+
+            switch (this.saliencyStrategy)
+                {
+                    case SaliencyStrategy.RandomBestLeastRecentlyViewed:
+                        this.dialogue.ContentSaliencyStrategy = new Saliency.RandomBestLeastRecentlyViewedSaliencyStrategy(this.VariableStorage);
+                        return;
+                    case SaliencyStrategy.FirstBestLeastRecentlyViewed:
+                        this.dialogue.ContentSaliencyStrategy = new Yarn.Saliency.BestLeastRecentlyViewedSaliencyStrategy(this.VariableStorage);
+                        return;
+                    case SaliencyStrategy.Best:
+                        this.dialogue.ContentSaliencyStrategy = new Yarn.Saliency.BestSaliencyStrategy();
+                        return;
+                    case SaliencyStrategy.First:
+                        this.dialogue.ContentSaliencyStrategy = new Yarn.Saliency.FirstSaliencyStrategy();
+                        return;
+                }
+        }
+
+        /// <summary>
         /// Called by Unity to start running dialogue if <see cref="autoStart"/>
         /// is enabled.
         /// </summary>
@@ -427,7 +473,7 @@ namespace Yarn.Unity
 
         /// <summary>
         /// Stops the dialogue immediately, and cancels any currently running
-        /// dialogue views.
+        /// dialogue presenters.
         /// </summary>
         public void Stop()
         {
@@ -489,9 +535,6 @@ namespace Yarn.Unity
 
         private void OnDialogueCompleted()
         {
-            dialogueCompletionSource?.TrySetResult();
-
-            onDialogueComplete?.Invoke();
             OnDialogueCompleteAsync().Forget();
         }
         private async YarnTask OnDialogueCompleteAsync()
@@ -531,6 +574,10 @@ namespace Yarn.Unity
 
             // Wait for all views to finish doing their clean up
             await YarnTask.WhenAll(pendingTasks);
+
+            // Finally, notify that dialogue is complete.
+            dialogueCompletionSource?.TrySetResult();
+            onDialogueComplete?.Invoke();
         }
 
         private void OnNodeCompleted(string completedNodeName)
@@ -571,7 +618,7 @@ namespace Yarn.Unity
                     Debug.LogError($"Can't call command <<{command.Text}>>, because {parts.ElementAtOrDefault(1)} doesn't have the correct component");
                     break;
                 case CommandDispatchResult.StatusType.InvalidParameterCount:
-                    Debug.LogError($"Can't call command <<{command.Text}>>: incorrect number of parameters");
+                    Debug.LogError($"Can't call command <<{command.Text}>>: {dispatchResult.Message ?? "incorrect number of parameters"}");
                     break;
                 case CommandDispatchResult.StatusType.CommandUnknown:
                     // Attempt a last-ditch dispatch by invoking our 'onCommand'
@@ -624,7 +671,7 @@ namespace Yarn.Unity
         }
 
         /// <summary>
-        /// Runs a localised line on all dialogue views.
+        /// Runs a localised line on all dialogue presenters.
         /// </summary>
         /// <remarks>
         /// This method can be called from two places: 1. when a line is being run,
@@ -899,6 +946,8 @@ namespace Yarn.Unity
             Dialogue.SetProgram(yarnProject.Program);
             Dialogue.SetNode(nodeName);
 
+            ApplySaliencyStrategy();
+
             onDialogueStart?.Invoke();
 
             StartDialogueAsync().Forget();
@@ -920,14 +969,14 @@ namespace Yarn.Unity
         }
 
         /// <summary>
-        /// Requests that all dialogue views stop showing the current line, and
+        /// Requests that all dialogue presenters stop showing the current line, and
         /// prepare to show the next piece of content.
         /// </summary>
         /// <remarks>
         /// <para>
         /// The specific behaviour of what happens when this method is called
         /// depends on the implementation of the Dialogue Runner's current
-        /// dialogue views.
+        /// dialogue presenters.
         /// </para>
         /// <para>
         /// If the dialogue runner is not currently running a line (for example,
@@ -950,14 +999,14 @@ namespace Yarn.Unity
         }
 
         /// <summary>
-        /// Requests that all dialogue views speed up their delivery of the
+        /// Requests that all dialogue presenters speed up their delivery of the
         /// current line.
         /// </summary>
         /// <remarks>
         /// <para>
         /// The specific behaviour of what happens when this method is called
         /// depends on the implementation of the Dialogue Runner's current
-        /// dialogue views.
+        /// dialogue presenters.
         /// </para>
         /// <para>
         /// If the dialogue runner is not currently running a line (for example,

@@ -4,8 +4,22 @@ All notable changes to this project will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 
-
 ## [Unreleased]
+
+### Added
+
+- The inspector for the Dialogue Runner now has a drop down for selecting the saliency strategy.
+
+### Changed
+
+- The Yarn Spinner header in the Inspector no longer shows `<u></u>` markup in versions of Unity prior to Unity 6.
+- `LinePresenter` now implements its typewriter effect with `BasicTypewriter`, an implementation of the `IAsyncTypewriter` interface. 
+- The typewriter effect in `LinePresenter` is now framerate-independent.
+- Fixed an issue in UnityLocalisedLineProvider where an exception would be thrown if an asset table was not provided.
+
+### Removed
+
+## [3.0.0] 2025-05-16
 
 ### Added
 
@@ -14,6 +28,15 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Description of package samples which summarises Samples therein.
 - Updated a few out-of-date HelpUrl values which referenced v1 docs.
 - Default Yarn Project exlude patterns updated to ignore the standard samples folders
+- Functions that are registered using the `AddFunction` method are now supported by the Yarn Spinner compiler.
+- YarnPackageImporter now has an install samples menu item in `Window -> Yarn Spinner -> Install Samples`
+- 'Incorrect number of parameters' error messages when running commands will now show more detailed error messages if available.
+- Yarn scripts can now directly link to vscode for situations where you want to use that as your Yarn editor but have another editor as your C# editor.
+- `UnityLocalisedLineProvider` now supports [fallback locales](https://docs.unity3d.com/Packages/com.unity.localization@1.5/manual/Locale.html#fallbacks).
+- `UnityLocalisedLineProvider` now supports shadow lines.
+- `BuiltinLocalisedLineProvider` now supports falling back to different locale.
+- `DialogueRunner.DialogueTask` now completes after all dialogue presenters finish their `OnDialogueComplete` method call, rather than before.
+- The `DialogueRunner.onDialogueComplete` event is now invoked after all dialogue presenters finish their `OnDialogueComplete` method call, rather than before.
 
 ### Changed
 
@@ -23,6 +46,12 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - Renamed 'Dialogue View Script' menu item to 'Dialogue Presenter Script'.
 - Added `DialogueRunner.DialoguePresenters` (and marked `DialogueRunner.DialogueViews` as obsolete.)
 - Fixed a lot of missing null checks
+- Fixed a bug in SampleRenderDetector that caused build errors.
+- Menu for creating a prefab dialogue system now says "Dialogue System" instead of "Dialogue Runner"
+- Line Advancer will now advance to the next line if the line presenter is finished presentation and is awaiting input and the player sends the hurry up action
+  - this only happens when the default line presenter is the one presenting the line
+  - other presenters don't really have an obvious "I am done showing, but not done presenting" concept as the line presenter does
+  - adopting this behaviour into other presenters is not difficult, just not something that can be done automatically
 
 ### Removed
 
@@ -31,6 +60,7 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/).
 - `LinesAvailable` property from line providers, it no longer makes sense in an async world
 - `baseLayer` property on Simple Character as it was no longer used
 - Obsolete uxml elements on `LanguagePopup.cs`
+- All samples, they now live in their own repository
 
 
 ## [3.0.0-beta2] 2025-04-09

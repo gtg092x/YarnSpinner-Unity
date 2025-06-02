@@ -11,6 +11,8 @@ namespace Yarn.Unity.Editor
     using UnityEngine;
 #endif
 
+#nullable enable
+
     /// <summary>
     /// Basic data class of unity settings that impact Yarn Spinner.
     /// </summary>
@@ -25,9 +27,10 @@ namespace Yarn.Unity.Editor
         public bool autoRefreshLocalisedAssets = true;
         public bool automaticallyLinkAttributedYarnCommandsAndFunctions = true;
         public bool generateYSLSFile = false;
+        public bool enableDirectLinkToVSCode = false;
 
         // need to make it os the output can be passed in also so it can log
-        internal static YarnSpinnerProjectSettings GetOrCreateSettings(string path = null, Yarn.Unity.ILogger iLogger = null)
+        internal static YarnSpinnerProjectSettings GetOrCreateSettings(string? path = null, Yarn.Unity.ILogger? iLogger = null)
         {
             var settingsPath = YarnSpinnerProjectSettingsPath;
             if (path != null)
@@ -51,10 +54,6 @@ namespace Yarn.Unity.Editor
                     logger.WriteLine($"Failed to load Yarn Spinner project settings at {settingsPath}: {e.Message}");
                 }
             }
-            else
-            {
-                logger.WriteLine($"No settings file exists at {settingsPath}, will fallback to default settings");
-            }
 
             settings.autoRefreshLocalisedAssets = true;
             settings.automaticallyLinkAttributedYarnCommandsAndFunctions = true;
@@ -64,7 +63,7 @@ namespace Yarn.Unity.Editor
             return settings;
         }
 
-        private static YarnSpinnerProjectSettings FromJson(string jsonString, Yarn.Unity.ILogger iLogger = null)
+        private static YarnSpinnerProjectSettings FromJson(string jsonString, Yarn.Unity.ILogger? iLogger = null)
         {
             var logger = ValidLogger(iLogger);
 
@@ -91,15 +90,17 @@ namespace Yarn.Unity.Editor
             bool automaticallyLinkAttributedYarnCommandsAndFunctions = GetValueOrDefault("automaticallyLinkAttributedYarnCommandsAndFunctions", true);
             bool autoRefreshLocalisedAssets = GetValueOrDefault("autoRefreshLocalisedAssets", true);
             bool generateYSLSFile = GetValueOrDefault("generateYSLSFile", false);
+            bool enableDirectLinkToVSCode = GetValueOrDefault("enableDirectLinkToVSCode", false);
 
             settings.automaticallyLinkAttributedYarnCommandsAndFunctions = automaticallyLinkAttributedYarnCommandsAndFunctions;
             settings.autoRefreshLocalisedAssets = autoRefreshLocalisedAssets;
             settings.generateYSLSFile = generateYSLSFile;
+            settings.enableDirectLinkToVSCode = enableDirectLinkToVSCode;
 
             return settings;
         }
 
-        internal void WriteSettings(string path = null, Yarn.Unity.ILogger iLogger = null)
+        internal void WriteSettings(string? path = null, Yarn.Unity.ILogger? iLogger = null)
         {
             var logger = ValidLogger(iLogger);
 
@@ -114,6 +115,7 @@ namespace Yarn.Unity.Editor
             dictForm["automaticallyLinkAttributedYarnCommandsAndFunctions"] = this.automaticallyLinkAttributedYarnCommandsAndFunctions;
             dictForm["autoRefreshLocalisedAssets"] = this.autoRefreshLocalisedAssets;
             dictForm["generateYSLSFile"] = this.generateYSLSFile;
+            dictForm["enableDirectLinkToVSCode"] = this.enableDirectLinkToVSCode;
 
             var jsonValue = Json.Serialize(dictForm);
 
@@ -135,7 +137,7 @@ namespace Yarn.Unity.Editor
 
         // if the provided logger is valid just return it
         // otherwise return the default logger
-        private static Yarn.Unity.ILogger ValidLogger(Yarn.Unity.ILogger iLogger)
+        private static Yarn.Unity.ILogger ValidLogger(Yarn.Unity.ILogger? iLogger)
         {
             var logger = iLogger;
             if (logger == null)

@@ -20,7 +20,7 @@ using TextMeshProUGUI = Yarn.Unity.TMPShim;
 namespace Yarn.Unity
 {
     /// <summary>
-    /// A Dialogue View that presents lines of dialogue, using Unity UI
+    /// A Dialogue Presenter that presents lines of dialogue, using Unity UI
     /// elements.
     /// </summary>
     [HelpURL("https://docs.yarnspinner.dev/using-yarnspinner-with-unity/components/dialogue-view/line-view")]
@@ -143,9 +143,9 @@ namespace Yarn.Unity
         /// </para>
         /// <para style="note"><para>The <see cref="DialogueRunner"/> will not
         /// proceed to the next piece of content (e.g. the next line, or the
-        /// next options) until all Dialogue Views have reported that they have
-        /// finished presenting their lines. If a <see cref="LineView"/> doesn't
-        /// report that it's finished until it receives input, the <see
+        /// next options) until all Dialogue Presenters have reported that they have
+        /// finished presenting their lines. If a <see cref="LinePresenter"/>
+        /// doesn't report that it's finished until it receives input, the <see
         /// cref="DialogueRunner"/> will end up pausing.</para>
         /// <para>
         /// This is useful for games in which you want the player to be able to
@@ -210,7 +210,6 @@ namespace Yarn.Unity
         [ShowIf(nameof(useTypewriterEffect))]
         [Label("Event Processors")]
         [SerializeField] List<ActionMarkupHandler> actionMarkupHandlers = new List<ActionMarkupHandler>();
-        public List<IActionMarkupHandler> temporalProcessors = new List<IActionMarkupHandler>();
 
         /// <inheritdoc/>
         public override YarnTask OnDialogueCompleteAsync()
@@ -243,7 +242,7 @@ namespace Yarn.Unity
                 // and add it to the front of the list
                 // that way it always happens first
                 var pauser = new PauseEventProcessor();
-                temporalProcessors.Insert(0, pauser);
+                ActionMarkupHandlers.Insert(0, pauser);
             }
 
             if (characterNameContainer == null && characterNameText != null)
@@ -255,7 +254,7 @@ namespace Yarn.Unity
         private void Start()
         {
             // we add all the monobehaviour handlers into the shared list
-            temporalProcessors.AddRange(actionMarkupHandlers);
+            ActionMarkupHandlers.AddRange(actionMarkupHandlers);
         }
 
         /// <summary>Presents a line using the configured text view.</summary>
@@ -306,7 +305,7 @@ namespace Yarn.Unity
             {
                 lineText.maxVisibleCharacters = 0;
                 // letting every temporal processor know that fade up (if set) is about to begin
-                foreach (var processor in temporalProcessors)
+                foreach (var processor in ActionMarkupHandlers)
                 {
                     processor.OnPrepareForLine(text, lineText);
                 }
@@ -332,41 +331,14 @@ namespace Yarn.Unity
 
             if (useTypewriterEffect)
             {
-                // letting every temporal processor know that fading is done and display is about to begin
-                foreach (var processor in temporalProcessors)
+                var typewriter = new BasicTypewriter()
                 {
-                    processor.OnLineDisplayBegin(text, lineText);
-                }
+                    ActionMarkupHandlers = this.actionMarkupHandlers,
+                    Text = this.lineText,
+                    CharactersPerSecond = this.typewriterEffectSpeed,
+                };
 
-                int milliSecondsPerLetter = 0;
-                if (typewriterEffectSpeed > 0)
-                {
-                    milliSecondsPerLetter = (int)(1000f / typewriterEffectSpeed);
-                }
-
-                // going through each character of the line and letting the processors know about it
-                for (int i = 0; i < text.Text.Length; i++)
-                {
-                    // telling every processor that it is time to process the current character
-                    foreach (var processor in temporalProcessors)
-                    {
-                        await processor.OnCharacterWillAppear(i, text, token.HurryUpToken).SuppressCancellationThrow();
-                    }
-
-                    lineText.maxVisibleCharacters += 1;
-                    if (milliSecondsPerLetter > 0)
-                    {
-                        await YarnTask.Delay(System.TimeSpan.FromMilliseconds(milliSecondsPerLetter), token.HurryUpToken).SuppressCancellationThrow();
-                    }
-                }
-
-                lineText.maxVisibleCharacters = text.Text.Length;
-
-                // letting each temporal processor know the line has finished displaying
-                foreach (var processor in temporalProcessors)
-                {
-                    processor.OnLineDisplayComplete();
-                }
+                await typewriter.RunTypewriter(text, token.HurryUpToken);
             }
 
             // if we are set to autoadvance how long do we hold for before continuing?
@@ -380,7 +352,7 @@ namespace Yarn.Unity
             }
 
             // we tell all action processors that the line is finished and is about to go away
-            foreach (var processor in temporalProcessors)
+            foreach (var processor in ActionMarkupHandlers)
             {
                 processor.OnLineWillDismiss();
             }
@@ -403,7 +375,7 @@ namespace Yarn.Unity
         /// <inheritdoc cref="DialoguePresenterBase.RunOptionsAsync(DialogueOption[], CancellationToken)" path="/param"/> 
         /// <inheritdoc cref="DialoguePresenterBase.RunOptionsAsync(DialogueOption[], CancellationToken)" path="/returns"/> 
         /// <remarks>
-        /// This dialogue view does not handle any options.
+        /// This dialogue presenter does not handle any options.
         /// </remarks>
         public override YarnTask<DialogueOption?> RunOptionsAsync(DialogueOption[] dialogueOptions, CancellationToken cancellationToken)
         {

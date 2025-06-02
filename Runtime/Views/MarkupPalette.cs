@@ -13,8 +13,8 @@ namespace Yarn.Unity
     /// Represents a collection of marker names and colours.
     /// </summary>
     /// <remarks>
-    /// This is intended to be used with the LineView, and also be a sample of
-    /// using the markup system.
+    /// This is intended to be used with the <see cref="LinePresenter"/>, and
+    /// also be a sample of using the markup system.
     /// </remarks>
     [CreateAssetMenu(fileName = "NewPalette", menuName = "Yarn Spinner/Markup Palette", order = 102)]
     public sealed class MarkupPalette : ScriptableObject
@@ -160,7 +160,7 @@ namespace Yarn.Unity
                     return true;
                 }
             }
-            
+
             // we now check if we have one in the format markers
             foreach (var item in CustomMarkers)
             {

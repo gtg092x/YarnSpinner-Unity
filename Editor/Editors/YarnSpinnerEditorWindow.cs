@@ -11,6 +11,8 @@ using UnityEngine;
 using UnityEngine.Networking;
 using Yarn.Compiler.Upgrader;
 
+#nullable enable
+
 namespace Yarn.Unity
 {
     public class YarnSpinnerEditorWindow : EditorWindow
@@ -34,10 +36,10 @@ namespace Yarn.Unity
         private const string PatreonURL = "https://www.patreon.com/bePatron?u=11132340";
 
         // The request object, used to fetch supportersText
-        static UnityWebRequest supportersRequest;
+        static UnityWebRequest? supportersRequest;
 
         // The dynamically fetched text to show in the About page.
-        static string supportersText = null;
+        static string? supportersText = null;
 
         // Unity requires all directory separators to be forward slashes, on all
         // platforms.
@@ -141,14 +143,13 @@ namespace Yarn.Unity
         enum SelectedMode
         {
             About,
-            UpgradeScripts,
         }
 
         SelectedMode selectedMode = 0;
 
-        private string YarnSpinnerCoreVersion;
-        private string YarnSpinnerCompilerVersion;
-        private string YarnSpinnerUnityVersion;
+        private string? YarnSpinnerCoreVersion;
+        private string? YarnSpinnerCompilerVersion;
+        private string? YarnSpinnerUnityVersion;
 
         void OnGUI()
         {
@@ -156,15 +157,13 @@ namespace Yarn.Unity
                                    .Select((x) => ObjectNames.NicifyVariableName(x))
                                    .ToArray();
 
-            selectedMode = (SelectedMode)GUILayout.Toolbar((int)selectedMode, modes);
+            // selectedMode = (SelectedMode)GUILayout.Toolbar((int)selectedMode, modes);
+            selectedMode = SelectedMode.About;
 
             switch (selectedMode)
             {
                 case SelectedMode.About:
                     DrawAboutGUI();
-                    break;
-                case SelectedMode.UpgradeScripts:
-                    DrawUpgradeGUI();
                     break;
             }
 
@@ -249,106 +248,6 @@ namespace Yarn.Unity
             }
         }
 
-        private void DrawUpgradeGUI()
-        {
-            // Show some introductory UI to explain the purpose of this
-            // page
-            GUILayout.Label("Upgrade your Yarn scripts from version 1 to version 2.");
-            EditorGUILayout.HelpBox("Upgrading a script that's already in version 2 may throw an error, but won't modify your file.", MessageType.Info);
-
-            using (var scroll = new EditorGUILayout.ScrollViewScope(upgradeViewScrollPos))
-            using (new EditorGUILayout.VerticalScope(EditorStyles.inspectorDefaultMargins))
-            {
-                upgradeViewScrollPos = scroll.scrollPosition;
-
-                // Show the list of scripts we can upgrade
-                foreach (var script in yarnProjectList)
-                {
-                    EditorGUILayout.BeginHorizontal();
-
-                    // Show the object field - disabled so people won't try
-                    // and replace items in the list with other scripts,
-                    // which won't work
-                    EditorGUI.BeginDisabledGroup(true);
-
-                    // All paths will begin with the path to the Assets
-                    // folder, so just remove that for tidiness
-                    var displayedScript = script.Replace(Application.dataPath + DirectorySeparatorChar, "");
-                    EditorGUILayout.LabelField(displayedScript);
-
-                    EditorGUI.EndDisabledGroup();
-
-                    EditorGUILayout.EndHorizontal();
-                }
-            }
-
-            // If we have any scripts, show an Upgrade All button
-            if (yarnProjectList.Count > 0)
-            {
-                if (GUILayout.Button("Upgrade Scripts"))
-                {
-                    UpgradeProjects(yarnProjectList, UpgradeType.Version1to2);
-                }
-            }
-        }
-
-        private void UpgradeProjects(IEnumerable<string> paths, UpgradeType upgradeMode)
-        {
-            var files = paths.Select(s =>
-            {
-                var source = File.ReadAllText(s);
-
-                var file = new Yarn.Compiler.CompilationJob.File()
-                {
-                    FileName = s,
-                    Source = source,
-                };
-
-                return file;
-            });
-
-            AssetDatabase.StartAssetEditing();
-
-            try
-            {
-                var upgradeJob = new UpgradeJob(upgradeMode, files);
-
-                var upgradeResult = LanguageUpgrader.Upgrade(upgradeJob);
-
-
-                foreach (var upgradedFile in upgradeResult.Files)
-                {
-                    if (upgradedFile.Replacements.Count() == 0 && upgradedFile.IsNewFile == false)
-                    {
-                        Debug.Log($"No upgrades required for {upgradedFile.Path}");
-
-                        continue;
-                    }
-
-                    // Log some diagnostics about what changes we're making
-                    foreach (var diagnostics in upgradedFile.Diagnostics)
-                    {
-                        Debug.Log($@"{upgradedFile.Path}: {diagnostics}");
-                    }
-
-                    var realPath = upgradedFile.Path.Replace(DirectorySeparatorChar, Path.DirectorySeparatorChar);
-
-                    // Save the text back to disk
-                    File.WriteAllText(realPath, upgradedFile.UpgradedSource, System.Text.Encoding.UTF8);
-
-                    // (Re-)import the asset
-                    AssetDatabase.ImportAsset(upgradedFile.Path);
-                }
-            }
-            catch (System.Exception e)
-            {
-                Debug.LogError($"Failed to run upgrade job: {e.GetType()} {e.Message}");
-                return;
-            }
-
-            AssetDatabase.StopAssetEditing();
-        }
-
         private void RefreshYarnProjectList()
         {
             // Search for all Yarn scripts, and load them into the list.
@@ -367,7 +266,7 @@ namespace Yarn.Unity
     internal class Icons
     {
 
-        private static Texture GetTexture(string textureName)
+        private static Texture? GetTexture(string textureName)
         {
             var guids = AssetDatabase.FindAssets(string.Format("{0} t:texture", textureName));
             if (guids.Length == 0)
@@ -377,8 +276,8 @@ namespace Yarn.Unity
             return AssetDatabase.LoadAssetAtPath<Texture>(path);
         }
 
-        static Texture _successIcon;
-        public static Texture SuccessIcon
+        static Texture? _successIcon;
+        public static Texture? SuccessIcon
         {
             get
             {
@@ -390,8 +289,8 @@ namespace Yarn.Unity
             }
         }
 
-        static Texture _failedIcon;
-        public static Texture FailedIcon
+        static Texture? _failedIcon;
+        public static Texture? FailedIcon
         {
             get
             {
@@ -403,8 +302,8 @@ namespace Yarn.Unity
             }
         }
 
-        static Texture _notTestedIcon;
-        public static Texture NotTestedIcon
+        static Texture? _notTestedIcon;
+        public static Texture? NotTestedIcon
         {
             get
             {
@@ -416,8 +315,8 @@ namespace Yarn.Unity
             }
         }
 
-        static Texture _windowIcon;
-        public static Texture WindowIcon
+        static Texture? _windowIcon;
+        public static Texture? WindowIcon
         {
             get
             {
@@ -429,8 +328,8 @@ namespace Yarn.Unity
             }
         }
 
-        static Texture _logo;
-        public static Texture Logo
+        static Texture? _logo;
+        public static Texture? Logo
         {
             get
             {

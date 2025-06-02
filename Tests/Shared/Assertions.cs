@@ -421,13 +421,11 @@ namespace Yarn.Unity.Tests
         /// collection.</param>
         /// <param name="message">An optional message to include if the
         /// assertion fails.</param>
-        public void Contain(TItem match, string? message = null)
+        public ObjectAssertions<TItem> Contain(TItem match, string? message = null)
         {
             var comparer = EqualityComparer<TItem>.Default;
-            Contain((TItem item) => comparer.Equals(item, match), message);
+            return Contain((TItem item) => comparer.Equals(item, match), message);
         }
-
-
 
         /// <summary>
         /// Asserts that the colection contains exactly the specified items.
@@ -882,6 +880,17 @@ namespace Yarn.Unity.Tests
         public void Contain(string substring, string? message = null)
         {
             Contain(substring, StringComparison.InvariantCulture, message);
+        }
+
+        public void Match(System.Text.RegularExpressions.Regex regex, string? message = null)
+        {
+            NullCheck(Subject, message);
+            NullCheck(regex, message);
+
+            if (regex.IsMatch(this.Subject) == false)
+            {
+                throw new AssertionException($"Expected string \"{Subject}\" to match regex substring \"{regex}\"", message);
+            }
         }
     }
 
